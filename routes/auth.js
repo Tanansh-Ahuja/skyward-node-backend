@@ -1,8 +1,10 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const router = express.Router();
+
 const pool = require('../db');
+
+const router = express.Router();
 
 // POST /login
 router.post('/login', async (req, res) => {

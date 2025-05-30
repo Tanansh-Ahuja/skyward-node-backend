@@ -6,7 +6,9 @@ const app = express();
 
 
 const authRoutes = require('./routes/auth');
-const utilsRoutes = require("./routes/utils")
+const utilsRoutes = require("./routes/utils");
+const sessionRouter = require('./routes/session');
+const classRoutes = require('./routes/classes');
 
 // Enable CORS only for specific origin
 const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5500';
@@ -21,6 +23,8 @@ app.use(morgan('dev'));
 
 app.use('/auth', authRoutes);
 app.use('/utils', utilsRoutes);
+app.use('/sessions', sessionRouter);
+app.use('/classes',classRoutes);
 
 app.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);
