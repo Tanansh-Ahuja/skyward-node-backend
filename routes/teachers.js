@@ -36,36 +36,38 @@ router.get("/", async (req, res) => {
 
 // POST /teachers
 router.post('/', async (req, res) => {
-  const { name, email, mobile, password} = req.body;
+  const { name, mobile, password } = req.body;
+  const email = req.body.email && req.body.email.trim() !== '' ? req.body.email.trim() : null;
 
   try {
-    // Check if user exists
-    const existing = await pool.query(
-      'SELECT * FROM users WHERE mobile = $1 OR email = $2',
-      [mobile, email]
-    );
+    // Check if user exists (only check email if not null)
+    const checkQuery = email
+      ? 'SELECT * FROM users WHERE mobile = $1 OR email = $2'
+      : 'SELECT * FROM users WHERE mobile = $1';
+    const checkValues = email ? [mobile, email] : [mobile];
+
+    const existing = await pool.query(checkQuery, checkValues);
     if (existing.rows.length > 0) {
       return res.status(409).json({ msg: 'User already exists' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = await pool.query(
-      `INSERT INTO users (name, email, mobile, password, role)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING user_id, name, email, mobile, role`,
-      [name, email, mobile, hashedPassword, 'teacher']
-    );
+    const insertUserQuery = `
+      INSERT INTO users (name, email, mobile, password, role)
+      VALUES ($1, $2, $3, $4, 'teacher')
+      RETURNING user_id
+    `;
+    const insertValues = [name, email, mobile, hashedPassword];
+    const userResult = await pool.query(insertUserQuery, insertValues);
 
-    const user = newUser.rows[0];
+    const user_id = userResult.rows[0].user_id;
 
-    await pool.query(
-      `INSERT INTO teachers (user_id,is_class_teacher,class_id)
-       VALUES ($1,$2,$3)`,
-      [user.user_id,false,null]
-    );
+    // Create teacher record
+    await pool.query(`INSERT INTO teachers (user_id, is_class_teacher) VALUES ($1, false)`, [user_id]);
 
-    res.status(201).json({ msg: 'Teacher registered', user });
+    res.status(201).json({ msg: 'Teacher created successfully' });
+
   } catch (err) {
     console.error('Error in POST /teachers:', err);
     res.status(500).json({ msg: 'Server error' });
@@ -90,6 +92,32 @@ router.patch('/:user_id', async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 });
+
+// DELETE /teachers/:userId
+router.delete('/:userId', async (req, res) => {
+  const userId = req.params.userId;
+
+  try {
+    // First, delete from teachers table (foreign key to users)
+    await pool.query(
+      'DELETE FROM teachers WHERE user_id = $1',
+      [userId]
+    );
+
+    // Then, delete from users table
+    await pool.query(
+      'DELETE FROM users WHERE user_id = $1',
+      [userId]
+    );
+
+    res.json({ msg: "Teacher deleted successfully" });
+
+  } catch (err) {
+    console.error("Error deleting teacher:", err);
+    res.status(500).json({ msg: "Server error while deleting teacher" });
+  }
+});
+
 
 
 module.exports = router;
