@@ -60,9 +60,9 @@ router.post('/', async (req, res) => {
     const user = newUser.rows[0];
 
     await pool.query(
-      `INSERT INTO teachers (user_id)
-       VALUES ($1)`,
-      [user.user_id, is_class_teacher ?? false, class_id ?? null]
+      `INSERT INTO teachers (user_id,is_class_teacher,class_id)
+       VALUES ($1,$2,$3)`,
+      [user.user_id,false,null]
     );
 
     res.status(201).json({ msg: 'Teacher registered', user });
@@ -75,7 +75,7 @@ router.post('/', async (req, res) => {
 // PATCH /teachers/:user_id
 router.patch('/:user_id', async (req, res) => {
   const { user_id } = req.params;
-  const { name, email, mobile, is_class_teacher, class_id } = req.body;
+  const { name, email, mobile} = req.body;
 
   try {
     const userQuery = `
@@ -83,14 +83,6 @@ router.patch('/:user_id', async (req, res) => {
         WHERE user_id = $4
     `;
     await pool.query(userQuery, [name, email, mobile, user_id]);
-
-    // Update teacher table
-    await pool.query(
-      `UPDATE teachers
-       SET is_class_teacher = $1, class_id = $2
-       WHERE user_id = $3`,
-      [is_class_teacher ?? false, class_id ?? null, user_id]
-    );
 
     res.status(200).json({ msg: 'Teacher updated successfully' });
   } catch (err) {
