@@ -4,6 +4,9 @@ const bcrypt = require('bcrypt');
 
 const router = express.Router();
 
+//////////////////////////////
+// HELPER FUNCTION
+//////////////////////////////
 // Helper: Get current session ID
 async function getCurrentSessionId() {
   const today = new Date().toISOString().split("T")[0]; // yyyy-mm-dd
@@ -14,6 +17,11 @@ async function getCurrentSessionId() {
   if (result.rows.length === 0) throw new Error("No active session found");
   return result.rows[0].session_id;
 }
+
+
+//////////////////////////////////////////////////////////////////////
+// BASIC QUERRIES
+/////////////////////////////////////////////////////////
 
 router.get("/", async (req, res) => {
   try {
@@ -191,6 +199,41 @@ router.delete('/unassign_class_teacher', async (req, res) => {
   }
 });
 
+// GET /teachers/unassigned
+router.get('/unassigned', async (req, res) => {
+  try {
+    // Step 1: Get all user_ids from teachers where is_class_teacher is false
+    const teacherRes = await pool.query(`
+      SELECT user_id FROM teachers WHERE is_class_teacher = false
+    `);
+
+    const userIds = teacherRes.rows.map(row => row.user_id);
+
+    if (userIds.length === 0) {
+      return res.json([]); // No unassigned teachers
+    }
+
+    // Step 2: Fetch names of those user_ids from users table
+    const placeholders = userIds.map((_, idx) => `$${idx + 1}`).join(', ');
+    const userRes = await pool.query(
+      `SELECT user_id, name FROM users WHERE user_id IN (${placeholders})`,
+      userIds
+    );
+
+    res.json(userRes.rows); // returns [{ user_id, name }, ...]
+    
+  } catch (err) {
+    console.error("Error fetching unassigned teachers:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+
+/////////////////////////////////////////
+// HEADER QUERRIES
+///////////////////////////////////////////
+
+
 // PATCH /teachers/:user_id
 router.patch('/:user_id', async (req, res) => {
   const { user_id } = req.params;
@@ -234,37 +277,6 @@ router.delete('/:userId', async (req, res) => {
     res.status(500).json({ msg: "Server error while deleting teacher" });
   }
 });
-
-// GET /teachers/unassigned
-router.get('/unassigned', async (req, res) => {
-  try {
-    // Step 1: Get all user_ids from teachers where is_class_teacher is false
-    const teacherRes = await pool.query(`
-      SELECT user_id FROM teachers WHERE is_class_teacher = false
-    `);
-
-    const userIds = teacherRes.rows.map(row => row.user_id);
-
-    if (userIds.length === 0) {
-      return res.json([]); // No unassigned teachers
-    }
-
-    // Step 2: Fetch names of those user_ids from users table
-    const placeholders = userIds.map((_, idx) => `$${idx + 1}`).join(', ');
-    const userRes = await pool.query(
-      `SELECT user_id, name FROM users WHERE user_id IN (${placeholders})`,
-      userIds
-    );
-
-    res.json(userRes.rows); // returns [{ user_id, name }, ...]
-    
-  } catch (err) {
-    console.error("Error fetching unassigned teachers:", err);
-    res.status(500).json({ msg: "Server error" });
-  }
-});
-
-
 
 
 module.exports = router;
