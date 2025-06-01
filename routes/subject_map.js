@@ -3,59 +3,6 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
-// =============================
-// SECTION 1: Manage Subjects
-// =============================
-
-// 1. Get all subjects
-router.get('/', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM subjects ORDER BY subject_id');
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Error fetching subjects:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-// 2. Add a new subject
-router.post('/', async (req, res) => {
-  const { subject_name } = req.body;
-
-  try {
-    const duplicateCheck = await pool.query(
-      'SELECT * FROM subjects WHERE subject_name = $1',
-      [subject_name]
-    );
-
-    if (duplicateCheck.rows.length > 0) {
-      return res.status(409).json({ error: 'Subject already exists' });
-    }
-
-    const result = await pool.query(
-      'INSERT INTO subjects (subject_name) VALUES ($1) RETURNING *',
-      [subject_name]
-    );
-
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error('Error adding subject:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-// 3. Delete a subject
-router.delete('/:id', async (req, res) => {
-  const subjectId = req.params.id;
-
-  try {
-    await pool.query('DELETE FROM subjects WHERE subject_id = $1', [subjectId]);
-    res.status(204).send();
-  } catch (err) {
-    console.error('Error deleting subject:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
 
 // =============================
 // SECTION 2: Mapping Summary
@@ -104,6 +51,83 @@ router.get("/summary", async (req, res) => {
     client.release();
   }
 });
+
+
+// =============================
+// SECTION 1: Manage Subjects
+// =============================
+
+// 1. Get all subjects
+router.get('/', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM subjects ORDER BY subject_id');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching subjects:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /subject_map/:classId
+router.get('/:classId', async (req, res) => {
+  const classId = req.params.classId;
+
+  try {
+    const result = await pool.query(
+      `SELECT s.subject_id, s.subject_name
+       FROM class_subjects cs
+       JOIN subjects s ON cs.subject_id = s.subject_id
+       WHERE cs.class_id = $1`,
+      [classId]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching subjects for class:", err);
+    res.status(500).json({ msg: "Internal server error" });
+  }
+});
+
+// 2. Add a new subject
+router.post('/', async (req, res) => {
+  const { subject_name } = req.body;
+
+  try {
+    const duplicateCheck = await pool.query(
+      'SELECT * FROM subjects WHERE subject_name = $1',
+      [subject_name]
+    );
+
+    if (duplicateCheck.rows.length > 0) {
+      return res.status(409).json({ error: 'Subject already exists' });
+    }
+
+    const result = await pool.query(
+      'INSERT INTO subjects (subject_name) VALUES ($1) RETURNING *',
+      [subject_name]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Error adding subject:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 3. Delete a subject
+router.delete('/:id', async (req, res) => {
+  const subjectId = req.params.id;
+
+  try {
+    await pool.query('DELETE FROM subjects WHERE subject_id = $1', [subjectId]);
+    res.status(204).send();
+  } catch (err) {
+    console.error('Error deleting subject:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
 // =============================
 // SECTION 3: Manage Mappings
 // =============================

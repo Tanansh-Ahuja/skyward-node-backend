@@ -13,6 +13,26 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /sessions/current - get the current session based on today's date
+router.get('/current', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM sessions 
+       WHERE CURRENT_DATE BETWEEN start_date AND end_date 
+       LIMIT 1`
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ msg: "No active session found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error fetching current session:", err);
+    res.status(500).json({ msg: "Internal server error" });
+  }
+});
+
 // POST new session
 router.post('/', async (req, res) => {
   const { session_name, start_date, end_date } = req.body;

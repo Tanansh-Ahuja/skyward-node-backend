@@ -4,6 +4,17 @@ const bcrypt = require('bcrypt');
 
 const router = express.Router();
 
+// Helper: Get current session ID
+async function getCurrentSessionId() {
+  const today = new Date().toISOString().split("T")[0]; // yyyy-mm-dd
+  const result = await pool.query(
+    `SELECT session_id FROM sessions 
+     WHERE start_date <= $1 AND end_date >= $1 
+     LIMIT 1`, [today]);
+  if (result.rows.length === 0) throw new Error("No active session found");
+  return result.rows[0].session_id;
+}
+
 router.get("/", async (req, res) => {
   try {
     const result = await pool.query(`
@@ -31,6 +42,35 @@ router.get("/", async (req, res) => {
   } catch (err) {
     console.error("Error fetching teachers:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET: Class-Teacher mappings
+router.get('/get_class_teacher_mappings', async (req, res) => {
+  try {
+    const sessionId = await getCurrentSessionId();
+
+    const result = await pool.query(`
+      SELECT 
+        c.class_name,
+        u.name AS class_teacher,
+        s.subject_name,
+        c.class_id,
+        t.teacher_id
+      FROM teacher_assignments ta
+      JOIN teachers t ON ta.teacher_id = t.teacher_id
+      JOIN users u ON t.user_id = u.user_id
+      JOIN classes c ON ta.class_id = c.class_id
+      JOIN subjects s ON ta.subject_id = s.subject_id
+      WHERE ta.session_id = $1
+        AND t.is_class_teacher = true
+    `, [sessionId]);
+
+    res.json(result.rows);
+
+  } catch (err) {
+    console.error("Error fetching class-teacher mappings:", err);
+    res.status(500).json({ error: "Failed to fetch mappings" });
   }
 });
 
@@ -71,6 +111,83 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('Error in POST /teachers:', err);
     res.status(500).json({ msg: 'Server error' });
+  }
+});
+
+router.post('/class_teacher_mappings', async (req, res) => {
+  const { class_id, user_id, subject_id } = req.body;
+
+  try {
+    // Step 1: Fetch current session
+    const sessionQuery = await pool.query(
+      `SELECT session_id FROM sessions WHERE CURRENT_DATE BETWEEN start_date AND end_date`
+    );
+
+    if (sessionQuery.rows.length === 0) {
+      return res.status(400).json({ msg: 'No active session found.' });
+    }
+
+    const session_id = sessionQuery.rows[0].session_id;
+
+    // Step 2: Check if this class already has a class teacher
+    const existingClassTeacher = await pool.query(
+      `SELECT * FROM teachers WHERE class_id = $1 AND is_class_teacher = true`,
+      [class_id]
+    );
+
+    if (existingClassTeacher.rows.length > 0) {
+      return res.status(400).json({ msg: 'This class already has a class teacher assigned.' });
+    }
+
+    // Step 3: Get teacher_id from user_id
+    const teacherRow = await pool.query(
+      `SELECT teacher_id FROM teachers WHERE user_id = $1`,
+      [user_id]
+    );
+
+    const teacher_id = teacherRow.rows[0]?.teacher_id;
+
+    if (!teacher_id) {
+      return res.status(400).json({ msg: 'Invalid teacher user ID.' });
+    }
+
+    // Step 4: Mark teacher as class teacher and assign class
+    await pool.query(
+      `UPDATE teachers SET is_class_teacher = true, class_id = $1 WHERE user_id = $2`,
+      [class_id, user_id]
+    );
+
+    // Step 5: Create teacher assignment
+    await pool.query(
+      `INSERT INTO teacher_assignments (teacher_id, class_id, subject_id, session_id)
+       VALUES ($1, $2, $3, $4)`,
+      [teacher_id, class_id, subject_id, session_id]
+    );
+
+    res.json({ msg: 'Class teacher mapped and assignment created successfully.' });
+
+  } catch (err) {
+    console.error("Error in POST /class_teacher_mappings:", err);
+    res.status(500).json({ msg: 'Server error', error: err.message });
+  }
+});
+
+// DELETE /teachers/class_teacher_mappings/:class_id
+router.delete('/unassign_class_teacher', async (req, res) => {
+  const { class_id, teacher_id } = req.body;
+
+  try {
+    await pool.query(`
+      DELETE FROM teacher_assignments
+      WHERE class_id = $1 AND teacher_id = $2
+    `, [class_id, teacher_id]);
+
+    await pool.query(`UPDATE teachers SET is_class_teacher = false, class_id = NULL WHERE teacher_id = $1`, [teacher_id]);
+
+    res.status(200).json({ message: "Class teacher unassigned successfully." });
+  } catch (err) {
+    console.error("Error unassigning class teacher:", err);
+    res.status(500).json({ error: "Failed to unassign class teacher." });
   }
 });
 
@@ -117,6 +234,36 @@ router.delete('/:userId', async (req, res) => {
     res.status(500).json({ msg: "Server error while deleting teacher" });
   }
 });
+
+// GET /teachers/unassigned
+router.get('/unassigned', async (req, res) => {
+  try {
+    // Step 1: Get all user_ids from teachers where is_class_teacher is false
+    const teacherRes = await pool.query(`
+      SELECT user_id FROM teachers WHERE is_class_teacher = false
+    `);
+
+    const userIds = teacherRes.rows.map(row => row.user_id);
+
+    if (userIds.length === 0) {
+      return res.json([]); // No unassigned teachers
+    }
+
+    // Step 2: Fetch names of those user_ids from users table
+    const placeholders = userIds.map((_, idx) => `$${idx + 1}`).join(', ');
+    const userRes = await pool.query(
+      `SELECT user_id, name FROM users WHERE user_id IN (${placeholders})`,
+      userIds
+    );
+
+    res.json(userRes.rows); // returns [{ user_id, name }, ...]
+    
+  } catch (err) {
+    console.error("Error fetching unassigned teachers:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
 
 
 
