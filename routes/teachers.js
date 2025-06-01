@@ -82,6 +82,94 @@ router.get('/get_class_teacher_mappings', async (req, res) => {
   }
 });
 
+// GET /teachers/view_subject_teacher_mappings
+router.get("/view_subject_teacher_mappings", async (req, res) => {
+  try {
+    const session_id = await getCurrentSessionId();
+    if (!session_id) return res.status(400).json({ error: "No active session found." });
+
+    // 1. Get all classes
+    const { rows: classes } = await pool.query(`
+      SELECT class_id, class_name FROM classes
+    `);
+
+    const finalResult = [];
+
+    for (let cls of classes) {
+      const { class_id, class_name } = cls;
+
+      // 2. For each class, get subject-teacher assignments
+      const { rows: subject_teacher } = await pool.query(`
+        SELECT 
+          s.subject_id,
+          s.subject_name,
+          t.teacher_id,
+          u.name AS teacher_name
+        FROM teacher_assignments ta
+        JOIN teachers t ON ta.teacher_id = t.teacher_id
+        JOIN subjects s ON ta.subject_id = s.subject_id
+        JOIN users u ON u.user_id = t.user_id
+        WHERE ta.class_id = $1 AND ta.session_id = $2
+        ORDER BY s.subject_name
+      `, [class_id, session_id]);
+
+      finalResult.push({
+        class_name,
+        class_id,
+        subject_teacher
+      });
+    }
+
+    res.json(finalResult);
+  } catch (err) {
+    console.error("Error fetching subject-teacher mappings:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/assign_subject_teacher", async (req, res) => {
+  const { class_id, subject_id, teacher_id } = req.body;
+
+  if (!class_id || !subject_id || !teacher_id) {
+    return res.status(400).json({ error: "Missing class_id, subject_id or teacher_id" });
+  }
+
+  try {
+    const session_id = await getCurrentSessionId();
+    if (!session_id) {
+      return res.status(400).json({ error: "No active session found" });
+    }
+
+    // Check if an assignment already exists
+    const { rows: existing } = await pool.query(`
+      SELECT * FROM teacher_assignments
+      WHERE class_id = $1 AND subject_id = $2 AND session_id = $3
+    `, [class_id, subject_id, session_id]);
+
+    if (existing.length > 0) {
+      // Update existing teacher assignment
+      await pool.query(`
+        UPDATE teacher_assignments
+        SET teacher_id = $1
+        WHERE class_id = $2 AND subject_id = $3 AND session_id = $4
+      `, [teacher_id, class_id, subject_id, session_id]);
+    } else {
+      // Insert new assignment
+      await pool.query(`
+        INSERT INTO teacher_assignments (class_id, subject_id, teacher_id, session_id)
+        VALUES ($1, $2, $3, $4)
+      `, [class_id, subject_id, teacher_id, session_id]);
+    }
+
+    res.status(200).json({ message: "Subject teacher assigned successfully" });
+
+  } catch (err) {
+    console.error("Error assigning subject teacher:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
 // POST /teachers
 router.post('/', async (req, res) => {
   const { name, mobile, password } = req.body;
