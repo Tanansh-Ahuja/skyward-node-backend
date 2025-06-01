@@ -24,6 +24,8 @@ router.get("/", async (req, res) => {
         classes c ON t.class_id = c.class_id
       WHERE 
         u.role = 'teacher'
+      ORDER BY
+        u.name
     `);
     res.json(result.rows);
   } catch (err) {
@@ -34,7 +36,7 @@ router.get("/", async (req, res) => {
 
 // POST /teachers
 router.post('/', async (req, res) => {
-  const { name, email, mobile, password, is_class_teacher, class_id } = req.body;
+  const { name, email, mobile, password} = req.body;
 
   try {
     // Check if user exists
@@ -58,8 +60,8 @@ router.post('/', async (req, res) => {
     const user = newUser.rows[0];
 
     await pool.query(
-      `INSERT INTO teachers (user_id, is_class_teacher, class_id)
-       VALUES ($1, $2, $3)`,
+      `INSERT INTO teachers (user_id)
+       VALUES ($1)`,
       [user.user_id, is_class_teacher ?? false, class_id ?? null]
     );
 
