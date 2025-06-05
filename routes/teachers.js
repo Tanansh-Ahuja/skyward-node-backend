@@ -304,7 +304,7 @@ router.get('/unassigned', async (req, res) => {
     // Step 2: Fetch names of those user_ids from users table
     const placeholders = userIds.map((_, idx) => `$${idx + 1}`).join(', ');
     const userRes = await pool.query(
-      `SELECT user_id, name FROM users WHERE user_id IN (${placeholders})`,
+      `SELECT user_id, name FROM users WHERE user_id IN (${placeholders}) ORDER BY name`,
       userIds
     );
 
