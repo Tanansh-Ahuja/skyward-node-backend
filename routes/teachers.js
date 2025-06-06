@@ -60,18 +60,21 @@ router.get('/get_class_teacher_mappings', async (req, res) => {
 
     const result = await pool.query(`
       SELECT 
-        c.class_name,
-        u.name AS class_teacher,
-        s.subject_name,
-        c.class_id,
-        t.teacher_id
-      FROM teacher_assignments ta
-      JOIN teachers t ON ta.teacher_id = t.teacher_id
-      JOIN users u ON t.user_id = u.user_id
-      JOIN classes c ON ta.class_id = c.class_id
-      JOIN subjects s ON ta.subject_id = s.subject_id
-      WHERE ta.session_id = $1
-        AND t.is_class_teacher = true
+      c.class_name,
+      u.name AS class_teacher,
+      s.subject_name,
+      c.class_id,
+      t.teacher_id
+    FROM teacher_assignments ta
+    JOIN teachers t ON ta.teacher_id = t.teacher_id
+    JOIN users u ON t.user_id = u.user_id
+    JOIN classes c ON ta.class_id = c.class_id
+    JOIN subjects s ON ta.subject_id = s.subject_id
+    WHERE ta.session_id = $1
+      AND t.is_class_teacher = true
+      AND t.class_id = ta.class_id
+      AND ta.is_class_teacher_subject = true
+    ORDER BY c.class_name;
     `, [sessionId]);
 
     res.json(result.rows);
@@ -255,8 +258,8 @@ router.post('/class_teacher_mappings', async (req, res) => {
 
     // Step 5: Create teacher assignment
     await pool.query(
-      `INSERT INTO teacher_assignments (teacher_id, class_id, subject_id, session_id)
-       VALUES ($1, $2, $3, $4)`,
+      `INSERT INTO teacher_assignments (teacher_id, class_id, subject_id, session_id,is_class_teacher_subject)
+       VALUES ($1, $2, $3, $4,true)`,
       [teacher_id, class_id, subject_id, session_id]
     );
 
