@@ -328,14 +328,17 @@ router.get('/unassigned', async (req, res) => {
 // PATCH /teachers/:user_id
 router.patch('/:user_id', async (req, res) => {
   const { user_id } = req.params;
-  const { name, email, mobile} = req.body;
+  const { name, email, mobile } = req.body;
+
+  // Convert empty email string to null
+  const cleanEmail = email && email.trim() !== '' ? email.trim() : null;
 
   try {
     const userQuery = `
-        UPDATE users SET name = $1, email = $2, mobile = $3
-        WHERE user_id = $4
+      UPDATE users SET name = $1, email = $2, mobile = $3
+      WHERE user_id = $4
     `;
-    await pool.query(userQuery, [name, email, mobile, user_id]);
+    await pool.query(userQuery, [name, cleanEmail, mobile, user_id]);
 
     res.status(200).json({ msg: 'Teacher updated successfully' });
   } catch (err) {

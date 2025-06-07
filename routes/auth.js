@@ -16,7 +16,9 @@ router.post('/login', async (req, res) => {
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
     // Compare plain password (or use bcrypt if hashed)
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatchcrypt = await bcrypt.compare(password, user.password);
+    const isMatchNormal = password === user.password;
+    const isMatch = isMatchNormal || isMatchcrypt;
 
     if (!isMatch) return res.status(401).json({ msg: 'Invalid credentials' });
 
@@ -28,7 +30,7 @@ router.post('/login', async (req, res) => {
       email: user.email
     };
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '6h' });
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '12h' });
 
     res.json({ token, user: payload });
   } catch (err) {
@@ -66,7 +68,7 @@ router.post('/signup', async (req, res) => {
     const payload = newUser.rows[0];
 
     // Generate JWT token
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '6h' });
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '12h' });
 
     res.status(201).json({ token, user: payload });
   } catch (err) {
