@@ -323,7 +323,67 @@ router.get('/unassigned', async (req, res) => {
 /////////////////////////////////////////
 // HEADER QUERRIES
 ///////////////////////////////////////////
+router.get('/me/mappings', async (req, res) => {
+  const userId = req.query.user_id;
 
+  if (!userId) {
+    return res.status(400).json({ msg: "user_id is required" });
+  }
+
+  try {
+    // Get teacher_id, is_class_teacher, class_id (if class teacher)
+    const teacherRes = await pool.query(
+      `SELECT teacher_id, is_class_teacher, class_id 
+       FROM teachers 
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (teacherRes.rows.length === 0) {
+      return res.status(404).json({ msg: "Teacher not found" });
+    }
+
+    const { teacher_id, is_class_teacher, class_id: classTeacherClassId } = teacherRes.rows[0];
+
+    // Fetch subject-class assignments for this teacher
+    const assignmentsRes = await pool.query(
+      `SELECT ta.class_id, ta.subject_id, c.class_name, s.subject_name
+       FROM teacher_assignments ta
+       JOIN classes c ON ta.class_id = c.class_id
+       JOIN subjects s ON ta.subject_id = s.subject_id
+       WHERE ta.teacher_id = $1
+       ORDER BY c.class_name`,
+      [teacher_id]
+    );
+
+    // Build subjects array
+    const subjects = assignmentsRes.rows.map(row => ({
+      class: row.class_name,
+      subject: row.subject_name
+    }));
+
+    let classTeacherClassName = null;
+    if (is_class_teacher && classTeacherClassId) {
+      const classRes = await pool.query(
+        `SELECT class_name FROM classes WHERE class_id = $1`,
+        [classTeacherClassId]
+      );
+      if (classRes.rows.length > 0) {
+        classTeacherClassName = classRes.rows[0].class_name;
+      }
+    }
+
+    res.json({
+      isClassTeacher: is_class_teacher,
+      classTeacherClass: classTeacherClassName,
+      subjects
+    });
+
+  } catch (err) {
+    console.error("Error in /teacher/me/mappings:", err);
+    res.status(500).json({ msg: "Internal server error" });
+  }
+});
 
 // PATCH /teachers/:user_id
 router.patch('/:user_id', async (req, res) => {
