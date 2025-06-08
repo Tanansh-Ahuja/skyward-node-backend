@@ -33,6 +33,33 @@ router.get('/admin/:id', async (req, res) => {
   }
 });
 
+// Get admin profile by ID
+router.get('/teacher/:id', async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+    const result = await pool.query(
+      'SELECT user_id, name, email, mobile, role FROM users WHERE user_id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+
+    const user = result.rows[0];
+
+    if (user.role !== 'teacher') {
+      return res.status(403).json({ msg: 'Access denied. Not an teacher.' });
+    }
+
+    res.json(user); // sends user_id, name, email, mobile, role (NO password)
+  } catch (err) {
+    console.error('Error fetching admin profile:', err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+});
+
 
 // PATCH - Update user with uniqueness check
 router.patch("/update_me/:id", async (req, res) => {
