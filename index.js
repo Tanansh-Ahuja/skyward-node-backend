@@ -12,6 +12,8 @@ const classRoutes = require('./routes/classes');
 const subjectMapRoutes = require('./routes/subject_map');
 const teachersRoutes = require('./routes/teachers');
 const usersRoutes = require('./routes/users');
+const studentRoutes = require('./routes/student');
+const marksRoutes = require('./routes/marks');
 
 // Enable CORS only for specific origin
 const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5500';
@@ -31,6 +33,8 @@ app.use('/classes',classRoutes);
 app.use('/subject_map',subjectMapRoutes);
 app.use('/teachers',teachersRoutes);
 app.use('/users',usersRoutes);
+app.use('/student',studentRoutes);
+app.use('/marks',marksRoutes);
 
 app.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);

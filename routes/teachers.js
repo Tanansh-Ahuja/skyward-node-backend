@@ -359,7 +359,9 @@ router.get('/me/mappings', async (req, res) => {
     // Build subjects array
     const subjects = assignmentsRes.rows.map(row => ({
       class: row.class_name,
-      subject: row.subject_name
+      subject: row.subject_name,
+      class_id: row.class_id,
+      subject_id: row.subject_id
     }));
 
     let classTeacherClassName = null;
