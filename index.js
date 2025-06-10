@@ -16,8 +16,8 @@ const studentRoutes = require('./routes/student');
 const marksRoutes = require('./routes/marks');
 
 // Enable CORS only for specific origin
-const allowedOrigin = process.env.CORS_ORIGIN || 'https://www.skywardweb.in';
-
+//const allowedOrigin = process.env.CORS_ORIGIN || 'https://www.skywardweb.in';
+const allowedOrigin = "https://www.skywardweb.in";
 app.use(cors({
   origin: allowedOrigin,
   credentials: true // allow cookies or auth headers if needed
