@@ -16,7 +16,7 @@ const studentRoutes = require('./routes/student');
 const marksRoutes = require('./routes/marks');
 
 // Enable CORS only for specific origin
-const allowedOrigin = process.env.CORS_ORIGIN || 'http://127.0.0.1:5500/login.html';
+const allowedOrigin = process.env.CORS_ORIGIN || 'http://127.0.0.1:5500';
 
 app.use(cors({
   origin: allowedOrigin,
