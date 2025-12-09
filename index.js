@@ -4,7 +4,6 @@ const morgan = require('morgan');
 const cors = require('cors');
 const app = express();
 
-
 const authRoutes = require('./routes/auth');
 const utilsRoutes = require("./routes/utils");
 const sessionRouter = require('./routes/session');
